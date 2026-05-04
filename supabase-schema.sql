@@ -65,11 +65,30 @@ create table if not exists itinerary_items (
   created_at timestamptz default now()
 );
 
+-- Reservations table (AI-extracted from uploaded files)
+create table if not exists reservations (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users(id) on delete cascade,
+  trip_id uuid references trips(id) on delete set null,
+  type text check (type in ('flight','hotel','car','train','activity','dining','transport','other')) default 'other',
+  vendor text,
+  confirmation_number text,
+  start_date date,
+  end_date date,
+  start_time time,
+  location text,
+  notes text,
+  file_path text,
+  file_name text,
+  created_at timestamptz default now()
+);
+
 -- Enable Row Level Security on all tables
 alter table trips enable row level security;
 alter table documents enable row level security;
 alter table loyalty_accounts enable row level security;
 alter table itinerary_items enable row level security;
+alter table reservations enable row level security;
 
 -- RLS Policies — users can only access their own data
 create policy "trips: users own data" on trips for all using (auth.uid() = user_id);
@@ -84,3 +103,6 @@ create index if not exists documents_user_id_idx on documents(user_id);
 create index if not exists documents_expiry_idx on documents(expiry_date);
 create index if not exists loyalty_user_id_idx on loyalty_accounts(user_id);
 create index if not exists itinerary_trip_id_idx on itinerary_items(trip_id);
+create policy "reservations: users own data" on reservations for all using (auth.uid() = user_id);
+create index if not exists reservations_user_id_idx on reservations(user_id);
+create index if not exists reservations_trip_id_idx on reservations(trip_id);
