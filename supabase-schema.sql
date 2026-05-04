@@ -59,7 +59,7 @@ create table if not exists itinerary_items (
   title text not null,
   description text,
   location text,
-  category text check (category in ('flight','hotel','train','activity','dining','transport','other')) default 'activity',
+  category text check (category in ('flight','hotel','train','car','activity','dining','transport','other')) default 'activity',
   booking_ref text,
   sort_order integer default 0,
   created_at timestamptz default now()

@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { tripsApi, itineraryApi } from '../lib/supabase'
 import { format, parseISO, isFuture, isPast } from 'date-fns'
+import { extractText, detectCategory, parseReservation } from '../lib/parseReservation'
 
 const BLANK_TRIP = { destination:'', country:'', start_date:'', end_date:'', status:'planning', hotel:'', booking_ref:'', points_used:'', points_program:'', notes:'' }
 const BLANK_ITEM = { item_date:'', item_time:'', title:'', category:'hotel', location:'', booking_ref:'', description:'' }
 
-const CAT_ICONS = { flight:'✈️', hotel:'🏨', train:'🚆', activity:'🎯', dining:'🍽️', transport:'🚗', other:'📌' }
+const CAT_ICONS = { flight:'✈️', hotel:'🏨', train:'🚆', car:'🚙', activity:'🎯', dining:'🍽️', transport:'🚗', other:'📌' }
+const CAT_LABELS = { flight:'Flight', hotel:'Hotel', train:'Train', car:'Car Rental', activity:'Activity', dining:'Dining', transport:'Transport', other:'Other' }
 
 export default function Trips() {
   const { user } = useAuth()
@@ -21,6 +23,10 @@ export default function Trips() {
   const [itemModal, setItemModal] = useState(null)
   const [itemForm, setItemForm] = useState(BLANK_ITEM)
   const [savingItem, setSavingItem] = useState(false)
+
+  const fileRef = useRef()
+  const [importingFor, setImportingFor] = useState(null)
+  const [parsing, setParsing] = useState(false)
 
   const load = async () => {
     const { data } = await tripsApi.getAll(user.id)
@@ -91,12 +97,41 @@ export default function Trips() {
     await loadItinerary(tripId)
   }
 
+  // File import
+  const triggerImport = (tripId) => {
+    setImportingFor(tripId)
+    fileRef.current.click()
+  }
+
+  const handleImport = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file || !importingFor) return
+    e.target.value = ''
+    setParsing(true)
+    try {
+      const text = await extractText(file)
+      const category = detectCategory(text)
+      const parsed = parseReservation(text, category)
+      setItemForm(parsed)
+      setItemModal({ tripId: importingFor })
+    } catch {
+      alert('Could not read file. Please try a .pdf, .txt, or .docx file.')
+    } finally {
+      setParsing(false)
+      setImportingFor(null)
+    }
+  }
+
   const upcoming = trips.filter(t => t.start_date && isFuture(parseISO(t.start_date)))
   const past = trips.filter(t => !t.start_date || isPast(parseISO(t.start_date)))
 
   const tripCard = (trip) => {
     const items = itineraries[trip.id] || []
     const isExpanded = expanded[trip.id]
+    const isParsing = parsing && importingFor === trip.id
+
+    // Category summary icons shown on collapsed card
+    const catSet = [...new Set(items.map(i => i.category))]
 
     return (
       <div key={trip.id} className="card">
@@ -115,19 +150,30 @@ export default function Trips() {
         {trip.notes && <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 8, fontStyle: 'italic' }}>{trip.notes}</div>}
 
         <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <button type="button" className="btn btn-sm" onClick={() => toggleExpand(trip.id)} style={{ fontSize: 12 }}>
-              {isExpanded ? '▲ Hide itinerary' : `▼ Itinerary${items.length > 0 ? ` (${items.length})` : ''}`}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <button type="button" className="btn btn-sm" onClick={() => toggleExpand(trip.id)} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+              {isExpanded ? '▲ Hide' : '▼ Reservations'}
+              {!isExpanded && catSet.length > 0 && (
+                <span style={{ letterSpacing: 2 }}>{catSet.map(c => CAT_ICONS[c] || '📌').join('')}</span>
+              )}
+              {!isExpanded && items.length > 0 && <span style={{ color: 'var(--text-2)', fontWeight: 400 }}>({items.length})</span>}
             </button>
             {isExpanded && (
-              <button className="btn btn-sm btn-primary" onClick={() => openAddItem(trip.id)} style={{ fontSize: 12 }}>+ Add item</button>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button className="btn btn-sm" onClick={() => triggerImport(trip.id)} disabled={isParsing} style={{ fontSize: 12 }}>
+                  {isParsing ? 'Reading…' : '↑ Import'}
+                </button>
+                <button className="btn btn-sm btn-primary" onClick={() => openAddItem(trip.id)} style={{ fontSize: 12 }}>+ Add</button>
+              </div>
             )}
           </div>
 
           {isExpanded && (
             <div style={{ marginTop: 10 }}>
               {items.length === 0 ? (
-                <div style={{ fontSize: 13, color: 'var(--text-2)', fontStyle: 'italic', padding: '6px 0' }}>No itinerary items yet.</div>
+                <div style={{ fontSize: 13, color: 'var(--text-2)', fontStyle: 'italic', padding: '6px 0' }}>
+                  No reservations yet — add one or import a PDF/file.
+                </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {items.map(item => (
@@ -135,13 +181,14 @@ export default function Trips() {
                       <span style={{ fontSize: 18, lineHeight: 1.3, flexShrink: 0 }}>{CAT_ICONS[item.category] || '📌'}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 14 }}>{item.title}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-2)', display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
-                          {item.item_date && <span>📅 {format(parseISO(item.item_date), 'MMM d')}</span>}
+                        <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 1 }}>{CAT_LABELS[item.category] || item.category}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-2)', display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 3 }}>
+                          {item.item_date && <span>📅 {format(parseISO(item.item_date), 'MMM d, yyyy')}</span>}
                           {item.item_time && <span>🕐 {item.item_time.slice(0, 5)}</span>}
                           {item.location && <span>📍 {item.location}</span>}
-                          {item.booking_ref && <span>Ref: {item.booking_ref}</span>}
+                          {item.booking_ref && <span style={{ fontFamily: 'monospace' }}>#{item.booking_ref}</span>}
                         </div>
-                        {item.description && <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 3, fontStyle: 'italic' }}>{item.description}</div>}
+                        {item.description && <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 4, fontStyle: 'italic', whiteSpace: 'pre-wrap', maxHeight: 60, overflow: 'hidden' }}>{item.description}</div>}
                       </div>
                       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                         <button className="btn btn-sm" style={{ fontSize: 11, padding: '2px 7px' }} onClick={() => openEditItem(trip.id, item)}>Edit</button>
@@ -167,6 +214,8 @@ export default function Trips() {
 
   return (
     <div>
+      <input ref={fileRef} type="file" accept=".pdf,.txt,.doc,.docx" style={{ display: 'none' }} onChange={handleImport} />
+
       <div className="page-header">
         <div>
           <h1 className="page-title">Trips</h1>
@@ -256,21 +305,22 @@ export default function Trips() {
         </div>
       )}
 
-      {/* Item modal */}
+      {/* Reservation item modal */}
       {itemModal && (
         <div className="modal-backdrop" onClick={closeItem}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <div className="modal-title">{itemModal.item ? 'Edit reservation' : 'Add to itinerary'}</div>
+              <div className="modal-title">{itemModal.item ? 'Edit reservation' : 'Add reservation'}</div>
               <button className="modal-close" onClick={closeItem}>×</button>
             </div>
             <form onSubmit={saveItem}>
               <div className="form-grid">
                 <div className="form-group">
-                  <label className="form-label">Category</label>
+                  <label className="form-label">Type</label>
                   <select className="form-select" value={itemForm.category} onChange={e => setItemForm(f => ({ ...f, category: e.target.value }))}>
                     <option value="flight">✈️ Flight</option>
                     <option value="hotel">🏨 Hotel</option>
+                    <option value="car">🚙 Car Rental</option>
                     <option value="train">🚆 Train</option>
                     <option value="activity">🎯 Activity</option>
                     <option value="dining">🍽️ Dining</option>
@@ -280,7 +330,7 @@ export default function Trips() {
                 </div>
                 <div className="form-group" style={{ gridColumn: '1/-1' }}>
                   <label className="form-label">Title *</label>
-                  <input className="form-input" required value={itemForm.title} onChange={e => setItemForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Hilton Check-in, Amtrak Coast Starlight" />
+                  <input className="form-input" required value={itemForm.title} onChange={e => setItemForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Hilton London Check-in, AA 1234, Hertz Rental" />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Date</label>
@@ -292,15 +342,15 @@ export default function Trips() {
                 </div>
                 <div className="form-group" style={{ gridColumn: '1/-1' }}>
                   <label className="form-label">Location</label>
-                  <input className="form-input" value={itemForm.location} onChange={e => setItemForm(f => ({ ...f, location: e.target.value }))} placeholder="e.g. Grand Central Terminal, New York" />
+                  <input className="form-input" value={itemForm.location} onChange={e => setItemForm(f => ({ ...f, location: e.target.value }))} placeholder="e.g. Heathrow Airport, 123 High St London" />
                 </div>
                 <div className="form-group" style={{ gridColumn: '1/-1' }}>
-                  <label className="form-label">Booking reference</label>
+                  <label className="form-label">Booking / Confirmation #</label>
                   <input className="form-input" value={itemForm.booking_ref} onChange={e => setItemForm(f => ({ ...f, booking_ref: e.target.value }))} placeholder="e.g. ABC123" />
                 </div>
                 <div className="form-group" style={{ gridColumn: '1/-1' }}>
                   <label className="form-label">Notes</label>
-                  <textarea className="form-textarea" rows={2} value={itemForm.description} onChange={e => setItemForm(f => ({ ...f, description: e.target.value }))} placeholder="Any details…" />
+                  <textarea className="form-textarea" rows={3} value={itemForm.description} onChange={e => setItemForm(f => ({ ...f, description: e.target.value }))} placeholder="Check-out date, seat number, car class, etc." />
                 </div>
               </div>
               <div className="modal-footer">
