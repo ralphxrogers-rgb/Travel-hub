@@ -49,6 +49,11 @@ Return only the JSON object — no markdown, no explanation."""
 def user_from_token(token: str):
     return supabase.auth.get_user(token.replace("Bearer ", "")).user
 
+def authed_client(token: str):
+    c = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+    c.postgrest.auth(token.replace("Bearer ", ""))
+    return c
+
 def save_upload(src: str, original_name: str, res_type: str) -> str:
     folder = UPLOAD_BASE / res_type
     folder.mkdir(parents=True, exist_ok=True)
@@ -262,6 +267,7 @@ def import_reservation():
         tmp_path = None  # moved; don't delete in finally
 
         user = user_from_token(token)
+        ac = authed_client(token)
         row = {
             "user_id": user.id,
             "trip_id": trip_id,
@@ -277,7 +283,7 @@ def import_reservation():
             "file_name": file.filename,
         }
 
-        result = supabase.table("reservations").insert(row).execute()
+        result = ac.table("reservations").insert(row).execute()
         return jsonify(result.data[0]), 201
 
     except json.JSONDecodeError:
@@ -292,25 +298,28 @@ def import_reservation():
 def get_reservations():
     token = request.headers.get("Authorization", "")
     trip_id = request.args.get("trip_id")
-    user = user_from_token(token)
-    query = supabase.table("reservations").select("*").eq("user_id", user.id).order("start_date")
+    ac = authed_client(token)
+    query = ac.table("reservations").select("*").order("start_date")
     if trip_id:
         query = query.eq("trip_id", trip_id)
     return jsonify(query.execute().data)
 
 @app.route("/api/reservations/<res_id>", methods=["PUT"])
 def update_reservation(res_id):
-    result = supabase.table("reservations").update(request.json).eq("id", res_id).execute()
+    token = request.headers.get("Authorization", "")
+    result = authed_client(token).table("reservations").update(request.json).eq("id", res_id).execute()
     return jsonify(result.data)
 
 @app.route("/api/reservations/<res_id>", methods=["DELETE"])
 def delete_reservation(res_id):
-    row = supabase.table("reservations").select("file_path").eq("id", res_id).execute().data
+    token = request.headers.get("Authorization", "")
+    ac = authed_client(token)
+    row = ac.table("reservations").select("file_path").eq("id", res_id).execute().data
     if row:
         fp = Path(row[0].get("file_path", ""))
         if fp.exists():
             fp.unlink()
-    supabase.table("reservations").delete().eq("id", res_id).execute()
+    ac.table("reservations").delete().eq("id", res_id).execute()
     return jsonify({"message": "Reservation deleted"})
 
 @app.route("/api/reservations/<res_id>/file", methods=["GET"])
