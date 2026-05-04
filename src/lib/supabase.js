@@ -44,3 +44,14 @@ export const itineraryApi = {
   update: (id, data) => supabase.from('itinerary_items').update(data).eq('id', id).select().single(),
   delete: (id) => supabase.from('itinerary_items').delete().eq('id', id),
 }
+
+// RESERVATIONS (files imported via Flask/Claude)
+export const reservationsApi = {
+  getByTrip: (tripId) =>
+    supabase.from('reservations').select('*').eq('trip_id', tripId).order('start_date'),
+}
+
+export async function getAccessToken() {
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.access_token || ''
+}

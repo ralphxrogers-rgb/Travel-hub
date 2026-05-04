@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
-import { tripsApi, itineraryApi } from '../lib/supabase'
+import { tripsApi, itineraryApi, reservationsApi, getAccessToken } from '../lib/supabase'
 import { format, parseISO, isFuture, isPast } from 'date-fns'
-import { extractText, detectCategory, parseReservation } from '../lib/parseReservation'
+
+const FLASK = 'http://localhost:5000'
 
 const BLANK_TRIP = { destination:'', country:'', start_date:'', end_date:'', status:'planning', hotel:'', booking_ref:'', points_used:'', points_program:'', notes:'' }
 const BLANK_ITEM = { item_date:'', item_time:'', title:'', category:'hotel', location:'', booking_ref:'', description:'' }
@@ -20,13 +21,15 @@ export default function Trips() {
 
   const [expanded, setExpanded] = useState({})
   const [itineraries, setItineraries] = useState({})
+  const [reservations, setReservations] = useState({})
   const [itemModal, setItemModal] = useState(null)
   const [itemForm, setItemForm] = useState(BLANK_ITEM)
   const [savingItem, setSavingItem] = useState(false)
 
   const fileRef = useRef()
   const [importingFor, setImportingFor] = useState(null)
-  const [parsing, setParsing] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importError, setImportError] = useState(null)
 
   const load = async () => {
     const { data } = await tripsApi.getAll(user.id)
@@ -40,10 +43,15 @@ export default function Trips() {
     setItineraries(prev => ({ ...prev, [tripId]: data || [] }))
   }
 
+  const loadReservations = async (tripId) => {
+    const { data } = await reservationsApi.getByTrip(tripId)
+    setReservations(prev => ({ ...prev, [tripId]: data || [] }))
+  }
+
   const toggleExpand = async (tripId) => {
     const next = !expanded[tripId]
     setExpanded(prev => ({ ...prev, [tripId]: next }))
-    if (next) await loadItinerary(tripId)
+    if (next) await Promise.all([loadItinerary(tripId), loadReservations(tripId)])
   }
 
   // Trip CRUD
@@ -63,6 +71,7 @@ export default function Trips() {
     if (!window.confirm('Delete this trip?')) return
     await tripsApi.delete(id)
     setItineraries(prev => { const n = { ...prev }; delete n[id]; return n })
+    setReservations(prev => { const n = { ...prev }; delete n[id]; return n })
     setExpanded(prev => { const n = { ...prev }; delete n[id]; return n })
     load()
   }
@@ -97,9 +106,10 @@ export default function Trips() {
     await loadItinerary(tripId)
   }
 
-  // File import
+  // File import → Flask → Claude
   const triggerImport = (tripId) => {
     setImportingFor(tripId)
+    setImportError(null)
     fileRef.current.click()
   }
 
@@ -107,30 +117,50 @@ export default function Trips() {
     const file = e.target.files?.[0]
     if (!file || !importingFor) return
     e.target.value = ''
-    setParsing(true)
+    setImporting(true)
+    setImportError(null)
+    const tripId = importingFor
+    setImportingFor(null)
     try {
-      const text = await extractText(file)
-      const category = detectCategory(text)
-      const parsed = parseReservation(text, category)
-      setItemForm(parsed)
-      setItemModal({ tripId: importingFor })
-    } catch {
-      alert('Could not read file. Please try a .pdf, .txt, or .docx file.')
+      const token = await getAccessToken()
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('trip_id', tripId)
+      const resp = await fetch(`${FLASK}/api/reservations/import`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      })
+      const json = await resp.json()
+      if (!resp.ok) throw new Error(json.error || 'Import failed')
+      await loadReservations(tripId)
+    } catch (err) {
+      setImportError(err.message)
     } finally {
-      setParsing(false)
-      setImportingFor(null)
+      setImporting(false)
     }
   }
+
+  const delReservation = async (tripId, resId) => {
+    if (!window.confirm('Delete this reservation and its file?')) return
+    const token = await getAccessToken()
+    await fetch(`${FLASK}/api/reservations/${resId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    await loadReservations(tripId)
+  }
+
+  const viewFile = (resId) => window.open(`${FLASK}/api/reservations/${resId}/file`, '_blank')
 
   const upcoming = trips.filter(t => t.start_date && isFuture(parseISO(t.start_date)))
   const past = trips.filter(t => !t.start_date || isPast(parseISO(t.start_date)))
 
   const tripCard = (trip) => {
     const items = itineraries[trip.id] || []
+    const res = reservations[trip.id] || []
     const isExpanded = expanded[trip.id]
-    const isParsing = parsing && importingFor === trip.id
-
-    // Category summary icons shown on collapsed card
+    const isImporting = importing && importingFor === null && isExpanded
     const catSet = [...new Set(items.map(i => i.category))]
 
     return (
@@ -153,15 +183,13 @@ export default function Trips() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
             <button type="button" className="btn btn-sm" onClick={() => toggleExpand(trip.id)} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
               {isExpanded ? '▲ Hide' : '▼ Reservations'}
-              {!isExpanded && catSet.length > 0 && (
-                <span style={{ letterSpacing: 2 }}>{catSet.map(c => CAT_ICONS[c] || '📌').join('')}</span>
-              )}
-              {!isExpanded && items.length > 0 && <span style={{ color: 'var(--text-2)', fontWeight: 400 }}>({items.length})</span>}
+              {!isExpanded && catSet.length > 0 && <span style={{ letterSpacing: 2 }}>{catSet.map(c => CAT_ICONS[c] || '📌').join('')}</span>}
+              {!isExpanded && (items.length + res.length) > 0 && <span style={{ color: 'var(--text-2)', fontWeight: 400 }}>({items.length + res.length})</span>}
             </button>
             {isExpanded && (
               <div style={{ display: 'flex', gap: 6 }}>
-                <button className="btn btn-sm" onClick={() => triggerImport(trip.id)} disabled={isParsing} style={{ fontSize: 12 }}>
-                  {isParsing ? 'Reading…' : '↑ Import'}
+                <button className="btn btn-sm" onClick={() => triggerImport(trip.id)} disabled={importing} style={{ fontSize: 12 }}>
+                  {importing ? 'Importing…' : '↑ Import file'}
                 </button>
                 <button className="btn btn-sm btn-primary" onClick={() => openAddItem(trip.id)} style={{ fontSize: 12 }}>+ Add</button>
               </div>
@@ -170,32 +198,72 @@ export default function Trips() {
 
           {isExpanded && (
             <div style={{ marginTop: 10 }}>
-              {items.length === 0 ? (
-                <div style={{ fontSize: 13, color: 'var(--text-2)', fontStyle: 'italic', padding: '6px 0' }}>
-                  No reservations yet — add one or import a PDF/file.
+              {importError && (
+                <div style={{ fontSize: 12, color: 'var(--danger)', marginBottom: 8, padding: '6px 10px', background: 'var(--danger-pale,#fef2f2)', borderRadius: 6 }}>
+                  Import failed: {importError}
                 </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {items.map(item => (
-                    <div key={item.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 10px', background: 'var(--surface-2,#f5f5f2)', borderRadius: 8 }}>
-                      <span style={{ fontSize: 18, lineHeight: 1.3, flexShrink: 0 }}>{CAT_ICONS[item.category] || '📌'}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14 }}>{item.title}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 1 }}>{CAT_LABELS[item.category] || item.category}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-2)', display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 3 }}>
-                          {item.item_date && <span>📅 {format(parseISO(item.item_date), 'MMM d, yyyy')}</span>}
-                          {item.item_time && <span>🕐 {item.item_time.slice(0, 5)}</span>}
-                          {item.location && <span>📍 {item.location}</span>}
-                          {item.booking_ref && <span style={{ fontFamily: 'monospace' }}>#{item.booking_ref}</span>}
+              )}
+
+              {/* Itinerary items */}
+              {items.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Schedule</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {items.map(item => (
+                      <div key={item.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 10px', background: 'var(--surface-2,#f5f5f2)', borderRadius: 8 }}>
+                        <span style={{ fontSize: 18, lineHeight: 1.3, flexShrink: 0 }}>{CAT_ICONS[item.category] || '📌'}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 14 }}>{item.title}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 1 }}>{CAT_LABELS[item.category]}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-2)', display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 3 }}>
+                            {item.item_date && <span>📅 {format(parseISO(item.item_date), 'MMM d, yyyy')}</span>}
+                            {item.item_time && <span>🕐 {item.item_time.slice(0, 5)}</span>}
+                            {item.location && <span>📍 {item.location}</span>}
+                            {item.booking_ref && <span style={{ fontFamily: 'monospace' }}>#{item.booking_ref}</span>}
+                          </div>
+                          {item.description && <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 3, fontStyle: 'italic' }}>{item.description}</div>}
                         </div>
-                        {item.description && <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 4, fontStyle: 'italic', whiteSpace: 'pre-wrap', maxHeight: 60, overflow: 'hidden' }}>{item.description}</div>}
+                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                          <button className="btn btn-sm" style={{ fontSize: 11, padding: '2px 7px' }} onClick={() => openEditItem(trip.id, item)}>Edit</button>
+                          <button className="btn btn-sm btn-danger" style={{ fontSize: 11, padding: '2px 7px' }} onClick={() => delItem(trip.id, item.id)}>✕</button>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        <button className="btn btn-sm" style={{ fontSize: 11, padding: '2px 7px' }} onClick={() => openEditItem(trip.id, item)}>Edit</button>
-                        <button className="btn btn-sm btn-danger" style={{ fontSize: 11, padding: '2px 7px' }} onClick={() => delItem(trip.id, item.id)}>✕</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Imported reservation files */}
+              {res.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Imported Files</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {res.map(r => (
+                      <div key={r.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 10px', background: 'var(--surface-2,#f5f5f2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                        <span style={{ fontSize: 18, lineHeight: 1.3, flexShrink: 0 }}>{CAT_ICONS[r.type] || '📄'}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 14 }}>{r.vendor || r.file_name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 1 }}>{CAT_LABELS[r.type]}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-2)', display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 3 }}>
+                            {r.start_date && <span>📅 {format(parseISO(r.start_date), 'MMM d, yyyy')}{r.end_date ? ` – ${format(parseISO(r.end_date), 'MMM d')}` : ''}</span>}
+                            {r.confirmation_number && <span style={{ fontFamily: 'monospace' }}>#{r.confirmation_number}</span>}
+                            {r.location && <span>📍 {r.location}</span>}
+                          </div>
+                          {r.notes && <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 3, fontStyle: 'italic' }}>{r.notes}</div>}
+                        </div>
+                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                          <button className="btn btn-sm" style={{ fontSize: 11, padding: '2px 7px' }} onClick={() => viewFile(r.id)}>View</button>
+                          <button className="btn btn-sm btn-danger" style={{ fontSize: 11, padding: '2px 7px' }} onClick={() => delReservation(trip.id, r.id)}>✕</button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {items.length === 0 && res.length === 0 && (
+                <div style={{ fontSize: 13, color: 'var(--text-2)', fontStyle: 'italic', padding: '6px 0' }}>
+                  No reservations yet — import a PDF/image or add manually.
                 </div>
               )}
             </div>
@@ -214,7 +282,7 @@ export default function Trips() {
 
   return (
     <div>
-      <input ref={fileRef} type="file" accept=".pdf,.txt,.doc,.docx" style={{ display: 'none' }} onChange={handleImport} />
+      <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" style={{ display: 'none' }} onChange={handleImport} />
 
       <div className="page-header">
         <div>
@@ -305,7 +373,7 @@ export default function Trips() {
         </div>
       )}
 
-      {/* Reservation item modal */}
+      {/* Item modal */}
       {itemModal && (
         <div className="modal-backdrop" onClick={closeItem}>
           <div className="modal" onClick={e => e.stopPropagation()}>
