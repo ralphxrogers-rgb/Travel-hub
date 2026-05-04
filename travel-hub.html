@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Travel Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0f1f3d;
+    --navy-light: #1a2f55;
+    --gold: #c9a84c;
+    --gold-light: #e8c97a;
+    --cream: #f5f0e8;
+    --white: #ffffff;
+    --gray: #6b7280;
+    --gray-light: #f3f4f6;
+    --red: #dc2626;
+    --green: #16a34a;
+    --shadow: 0 4px 24px rgba(15,31,61,0.12);
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--navy); min-height: 100vh; }
+
+  /* AUTH */
+  #auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%); padding: 20px; }
+  .auth-card { background: var(--white); border-radius: 20px; padding: 48px 40px; width: 100%; max-width: 420px; box-shadow: 0 24px 64px rgba(0,0,0,0.3); }
+  .auth-logo { font-family: 'Playfair Display', serif; font-size: 28px; color: var(--navy); text-align: center; margin-bottom: 6px; }
+  .auth-logo span { color: var(--gold); }
+  .auth-subtitle { text-align: center; color: var(--gray); font-size: 14px; margin-bottom: 36px; }
+  .auth-tabs { display: flex; background: var(--gray-light); border-radius: 10px; padding: 4px; margin-bottom: 28px; }
+  .auth-tab { flex: 1; padding: 10px; border: none; background: transparent; border-radius: 8px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; color: var(--gray); transition: all 0.2s; }
+  .auth-tab.active { background: var(--white); color: var(--navy); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .form-group { margin-bottom: 18px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--navy); margin-bottom: 6px; }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px 16px; border: 1.5px solid #e5e7eb; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--navy); background: var(--white); transition: border-color 0.2s; outline: none; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--gold); }
+  .form-group textarea { resize: vertical; min-height: 80px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 24px; border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; text-decoration: none; }
+  .btn-primary { background: var(--navy); color: var(--white); width: 100%; }
+  .btn-primary:hover { background: var(--navy-light); transform: translateY(-1px); }
+  .btn-gold { background: var(--gold); color: var(--navy); }
+  .btn-gold:hover { background: var(--gold-light); }
+  .btn-outline { background: transparent; color: var(--navy); border: 1.5px solid #e5e7eb; }
+  .btn-outline:hover { border-color: var(--navy); }
+  .btn-danger { background: #fef2f2; color: var(--red); border: 1.5px solid #fecaca; }
+  .btn-danger:hover { background: #fee2e2; }
+  .btn-import { background: #eff6ff; color: #1d4ed8; border: 1.5px solid #bfdbfe; }
+  .btn-import:hover { background: #dbeafe; }
+  .btn-sm { padding: 8px 14px; font-size: 13px; }
+  .error-msg { background: #fef2f2; color: var(--red); padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; }
+  .success-msg { background: #f0fdf4; color: var(--green); padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; }
+
+  /* APP */
+  #app-screen { display: none; min-height: 100vh; }
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 240px; background: var(--navy); z-index: 100; display: flex; flex-direction: column; }
+  .sidebar-logo { padding: 28px 24px 24px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .sidebar-logo h1 { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--white); }
+  .sidebar-logo h1 span { color: var(--gold); }
+  .sidebar-logo p { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+  .sidebar-nav { flex: 1; padding: 16px 12px; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 10px; cursor: pointer; color: rgba(255,255,255,0.6); font-size: 14px; transition: all 0.2s; margin-bottom: 4px; border: none; background: none; width: 100%; text-align: left; }
+  .nav-item:hover { background: rgba(255,255,255,0.08); color: var(--white); }
+  .nav-item.active { background: rgba(201,168,76,0.15); color: var(--gold); }
+  .nav-item .icon { font-size: 18px; width: 20px; text-align: center; }
+  .sidebar-footer { padding: 16px 12px; border-top: 1px solid rgba(255,255,255,0.08); }
+  .user-info { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 8px; }
+  .user-avatar { width: 32px; height: 32px; background: var(--gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: var(--navy); }
+  .user-email { font-size: 12px; color: rgba(255,255,255,0.5); word-break: break-all; }
+  .main-content { margin-left: 240px; padding: 32px; min-height: 100vh; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 12px; }
+  .page-title { font-family: 'Playfair Display', serif; font-size: 28px; color: var(--navy); }
+  .page-title span { color: var(--gold); }
+  .page-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .card { background: var(--white); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); margin-bottom: 16px; }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .trip-card { background: var(--white); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); border-left: 4px solid var(--gold); transition: transform 0.2s; }
+  .trip-card:hover { transform: translateY(-2px); }
+  .trip-card h3 { font-family: 'Playfair Display', serif; font-size: 18px; margin-bottom: 4px; }
+  .trip-card .country { font-size: 13px; color: var(--gray); margin-bottom: 12px; }
+  .trip-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+  .badge-planning { background: #eff6ff; color: #1d4ed8; }
+  .badge-confirmed { background: #f0fdf4; color: #16a34a; }
+  .badge-completed { background: #f5f3ff; color: #7c3aed; }
+  .badge-cancelled { background: #fef2f2; color: #dc2626; }
+  .badge-gold { background: #fefce8; color: #854d0e; }
+  .trip-actions { display: flex; gap: 8px; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(15,31,61,0.6); z-index: 200; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: var(--white); border-radius: 16px; padding: 32px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,0.2); }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .modal-title { font-family: 'Playfair Display', serif; font-size: 22px; }
+  .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray); line-height: 1; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .stat-card { background: var(--white); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); text-align: center; }
+  .stat-number { font-family: 'Playfair Display', serif; font-size: 32px; color: var(--navy); line-height: 1; margin-bottom: 4px; }
+  .stat-label { font-size: 13px; color: var(--gray); }
+  .loading { text-align: center; padding: 40px; color: var(--gray); font-size: 14px; }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--gray); }
+  .empty-state .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-state p { font-size: 15px; margin-bottom: 20px; }
+  .doc-card { background: var(--white); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); transition: transform 0.2s; }
+  .doc-card:hover { transform: translateY(-2px); }
+  .doc-type-icon { font-size: 28px; margin-bottom: 10px; }
+  .doc-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .doc-expiry { font-size: 12px; margin-top: 8px; padding: 4px 10px; border-radius: 20px; display: inline-block; }
+  .expiry-ok { background: #f0fdf4; color: #16a34a; }
+  .expiry-soon { background: #fffbeb; color: #d97706; }
+  .expiry-expired { background: #fef2f2; color: #dc2626; }
+  .loyalty-card { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%); border-radius: var(--radius); padding: 24px; color: var(--white); position: relative; overflow: hidden; }
+  .loyalty-card::before { content: ''; position: absolute; right: -20px; top: -20px; width: 120px; height: 120px; border-radius: 50%; background: rgba(201,168,76,0.1); }
+  .loyalty-program { font-family: 'Playfair Display', serif; font-size: 20px; margin-bottom: 4px; }
+  .loyalty-id { font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 16px; }
+  .loyalty-points { font-size: 36px; font-weight: 300; color: var(--gold); line-height: 1; }
+  .loyalty-points span { font-size: 14px; color: rgba(255,255,255,0.5); }
+  .loyalty-tier { margin-top: 12px; font-size: 12px; background: rgba(201,168,76,0.2); color: var(--gold); padding: 4px 10px; border-radius: 20px; display: inline-block; }
+  .loyalty-actions { margin-top: 16px; display: flex; gap: 8px; }
+  .btn-light { background: rgba(255,255,255,0.1); color: var(--white); border: 1px solid rgba(255,255,255,0.2); }
+  .btn-light:hover { background: rgba(255,255,255,0.2); }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--navy); color: var(--white); padding: 14px 20px; border-radius: 10px; font-size: 14px; z-index: 999; transform: translateY(80px); opacity: 0; transition: all 0.3s; box-shadow: var(--shadow); }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-left: 4px solid var(--green); }
+  .toast.error { border-left: 4px solid var(--red); }
+
+  /* IMPORT */
+  .import-zone { border: 2px dashed #d1d5db; border-radius: 12px; padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--gray-light); margin-top: 4px; }
+  .import-zone:hover, .import-zone.dragover { border-color: var(--gold); background: #fefce8; }
+  .import-zone .import-icon { font-size: 40px; margin-bottom: 12px; }
+  .import-zone p { font-size: 14px; color: var(--gray); margin-top: 4px; }
+  .import-zone input[type=file] { display: none; }
+  .import-preview { margin-top: 16px; overflow-x: auto; }
+  .import-preview table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .import-preview th { background: var(--gray-light); padding: 8px 12px; text-align: left; font-weight: 600; }
+  .import-preview td { padding: 8px 12px; border-bottom: 1px solid #f3f4f6; }
+  .import-preview .scroll-wrap { max-height: 220px; overflow-y: auto; }
+  .import-status { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .import-status.new { background: #f0fdf4; color: #16a34a; }
+  .import-status.duplicate { background: #fffbeb; color: #d97706; }
+  .ai-processing { display: flex; align-items: center; gap: 12px; padding: 16px; background: #eff6ff; border-radius: 10px; margin-top: 16px; font-size: 14px; color: #1d4ed8; }
+  .spinner { width: 20px; height: 20px; border: 2px solid #bfdbfe; border-top-color: #1d4ed8; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; background: var(--gray-light); padding: 4px; border-radius: 10px; }
+  .tab-btn { flex: 1; padding: 10px; border: none; background: transparent; border-radius: 8px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: var(--gray); transition: all 0.2s; }
+  .tab-btn.active { background: var(--white); color: var(--navy); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .import-summary { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 16px; margin-top: 16px; font-size: 14px; }
+  .import-summary h4 { color: #16a34a; margin-bottom: 6px; }
+  .csv-hint { font-size: 12px; color: var(--gray); margin-bottom: 8px; }
+  .csv-hint a { color: var(--gold); cursor: pointer; text-decoration: underline; }
+  .duplicate-item { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .duplicate-item strong { display: block; margin-bottom: 4px; font-size: 15px; }
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">Travel <span>Hub</span></div>
+    <p class="auth-subtitle">Your personal travel command center</p>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchTab('login')">Sign In</button>
+      <button class="auth-tab" onclick="switchTab('signup')">Sign Up</button>
+    </div>
+    <div id="auth-error" class="error-msg"></div>
+    <div id="auth-success" class="success-msg"></div>
+    <div id="login-form">
+      <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="you@example.com"></div>
+      <div class="form-group"><label>Password</label><input type="password" id="login-password" placeholder="••••••••"></div>
+      <button class="btn btn-primary" onclick="login()">Sign In</button>
+    </div>
+    <div id="signup-form" style="display:none">
+      <div class="form-group"><label>Email</label><input type="email" id="signup-email" placeholder="you@example.com"></div>
+      <div class="form-group"><label>Password</label><input type="password" id="signup-password" placeholder="Min 6 characters"></div>
+      <button class="btn btn-primary" onclick="signup()">Create Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app-screen">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <h1>Travel <span>Hub</span></h1>
+      <p>Personal Travel Manager</p>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" onclick="showPage('dashboard', this)"><span class="icon">🗺️</span> Dashboard</button>
+      <button class="nav-item" onclick="showPage('trips', this)"><span class="icon">✈️</span> Trips</button>
+      <button class="nav-item" onclick="showPage('documents', this)"><span class="icon">📄</span> Documents</button>
+      <button class="nav-item" onclick="showPage('loyalty', this)"><span class="icon">⭐</span> Loyalty</button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <div class="user-email" id="user-email-display"></div>
+      </div>
+      <button class="nav-item" onclick="logout()"><span class="icon">🚪</span> Sign Out</button>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <!-- Dashboard -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-header"><h2 class="page-title">Good to see you <span id="welcome-name">Traveler</span> ✈️</h2></div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-number" id="stat-trips">0</div><div class="stat-label">Total Trips</div></div>
+        <div class="stat-card"><div class="stat-number" id="stat-upcoming">0</div><div class="stat-label">Upcoming</div></div>
+        <div class="stat-card"><div class="stat-number" id="stat-docs">0</div><div class="stat-label">Documents</div></div>
+        <div class="stat-card"><div class="stat-number" id="stat-loyalty">0</div><div class="stat-label">Loyalty Programs</div></div>
+      </div>
+      <div class="card">
+        <h3 style="font-family:'Playfair Display',serif;font-size:18px;margin-bottom:16px;">Upcoming Trips</h3>
+        <div id="dashboard-trips"><div class="loading">Loading...</div></div>
+      </div>
+    </div>
+
+    <!-- Trips -->
+    <div id="page-trips" class="page">
+      <div class="page-header">
+        <h2 class="page-title">My <span>Trips</span></h2>
+        <button class="btn btn-gold" onclick="openTripModal()">+ Add Trip</button>
+      </div>
+      <div id="trips-list"><div class="loading">Loading...</div></div>
+    </div>
+
+    <!-- Documents -->
+    <div id="page-documents" class="page">
+      <div class="page-header">
+        <h2 class="page-title">My <span>Documents</span></h2>
+        <div class="page-actions">
+          <button class="btn btn-import btn-sm" onclick="openImportModal('documents')">📥 Import</button>
+          <button class="btn btn-gold" onclick="openDocModal()">+ Add Document</button>
+        </div>
+      </div>
+      <div id="docs-list" class="card-grid"><div class="loading">Loading...</div></div>
+    </div>
+
+    <!-- Loyalty -->
+    <div id="page-loyalty" class="page">
+      <div class="page-header">
+        <h2 class="page-title">Loyalty <span>Programs</span></h2>
+        <div class="page-actions">
+          <button class="btn btn-import btn-sm" onclick="openImportModal('loyalty')">📥 Import</button>
+          <button class="btn btn-gold" onclick="openLoyaltyModal()">+ Add Program</button>
+        </div>
+      </div>
+      <div id="loyalty-list" class="card-grid"><div class="loading">Loading...</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- TRIP MODAL -->
+<div class="modal-overlay" id="trip-modal">
+  <div class="modal">
+    <div class="modal-header"><h3 class="modal-title" id="trip-modal-title">Add Trip</h3><button class="modal-close" onclick="closeModal('trip-modal')">×</button></div>
+    <input type="hidden" id="trip-id">
+    <div class="form-row">
+      <div class="form-group"><label>Destination *</label><input type="text" id="trip-destination" placeholder="e.g. Paris"></div>
+      <div class="form-group"><label>Country</label><input type="text" id="trip-country" placeholder="e.g. France"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Start Date</label><input type="date" id="trip-start"></div>
+      <div class="form-group"><label>End Date</label><input type="date" id="trip-end"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Status</label><select id="trip-status"><option value="planning">Planning</option><option value="confirmed">Confirmed</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></div>
+      <div class="form-group"><label>Hotel</label><input type="text" id="trip-hotel" placeholder="Hotel name"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Booking Ref</label><input type="text" id="trip-ref"></div>
+      <div class="form-group"><label>Points Program</label><input type="text" id="trip-points-program"></div>
+    </div>
+    <div class="form-group"><label>Points Used</label><input type="number" id="trip-points" placeholder="0"></div>
+    <div class="form-group"><label>Notes</label><textarea id="trip-notes"></textarea></div>
+    <div style="display:flex;gap:10px;"><button class="btn btn-primary" onclick="saveTrip()" style="flex:1">Save Trip</button><button class="btn btn-outline" onclick="closeModal('trip-modal')">Cancel</button></div>
+  </div>
+</div>
+
+<!-- DOCUMENT MODAL -->
+<div class="modal-overlay" id="doc-modal">
+  <div class="modal">
+    <div class="modal-header"><h3 class="modal-title" id="doc-modal-title">Add Document</h3><button class="modal-close" onclick="closeModal('doc-modal')">×</button></div>
+    <input type="hidden" id="doc-id">
+    <div class="form-row">
+      <div class="form-group"><label>Document Name *</label><input type="text" id="doc-name" placeholder="e.g. My Passport"></div>
+      <div class="form-group"><label>Type</label><select id="doc-type"><option value="passport">Passport</option><option value="visa">Visa</option><option value="insurance">Insurance</option><option value="membership">Membership</option><option value="license">License</option><option value="other">Other</option></select></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Document Number</label><input type="text" id="doc-number"></div>
+      <div class="form-group"><label>Issuing Country</label><input type="text" id="doc-country"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Issued Date</label><input type="date" id="doc-issued"></div>
+      <div class="form-group"><label>Expiry Date</label><input type="date" id="doc-expiry"></div>
+    </div>
+    <div class="form-group"><label>Notes</label><textarea id="doc-notes"></textarea></div>
+    <div style="display:flex;gap:10px;"><button class="btn btn-primary" onclick="saveDocument()" style="flex:1">Save Document</button><button class="btn btn-outline" onclick="closeModal('doc-modal')">Cancel</button></div>
+  </div>
+</div>
+
+<!-- LOYALTY MODAL -->
+<div class="modal-overlay" id="loyalty-modal">
+  <div class="modal">
+    <div class="modal-header"><h3 class="modal-title" id="loyalty-modal-title">Add Loyalty Program</h3><button class="modal-close" onclick="closeModal('loyalty-modal')">×</button></div>
+    <input type="hidden" id="loyalty-id">
+    <div class="form-row">
+      <div class="form-group"><label>Program Name *</label><input type="text" id="loyalty-program" placeholder="e.g. Qantas Frequent Flyer"></div>
+      <div class="form-group"><label>Member ID</label><input type="text" id="loyalty-member-id"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Points Balance</label><input type="number" id="loyalty-points" placeholder="0"></div>
+      <div class="form-group"><label>Tier / Status</label><input type="text" id="loyalty-tier" placeholder="e.g. Gold"></div>
+    </div>
+    <div class="form-group"><label>Points Expiry Date</label><input type="date" id="loyalty-expiry"></div>
+    <div class="form-group"><label>Notes</label><textarea id="loyalty-notes"></textarea></div>
+    <div style="display:flex;gap:10px;"><button class="btn btn-primary" onclick="saveLoyalty()" style="flex:1">Save Program</button><button class="btn btn-outline" onclick="closeModal('loyalty-modal')">Cancel</button></div>
+  </div>
+</div>
+
+<!-- IMPORT MODAL -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-header">
+      <h3 class="modal-title" id="import-modal-title">Import</h3>
+      <button class="modal-close" onclick="closeModal('import-modal')">×</button>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-csv" onclick="switchImportTab('csv')">📊 CSV Spreadsheet</button>
+      <button class="tab-btn" id="tab-ai" onclick="switchImportTab('ai')">🤖 PDF / Word (AI)</button>
+    </div>
+
+    <!-- CSV -->
+    <div id="import-tab-csv">
+      <p class="csv-hint">Need a template? <a onclick="downloadTemplate()">Download CSV template</a></p>
+      <div class="import-zone" id="csv-drop-zone"
+        onclick="document.getElementById('csv-file-input').click()"
+        ondragover="handleDragOver(event,'csv-drop-zone')"
+        ondragleave="handleDragLeave(event,'csv-drop-zone')"
+        ondrop="handleDrop(event,'csv')">
+        <input type="file" id="csv-file-input" accept=".csv" onchange="handleCSVFile(this.files[0])">
+        <div class="import-icon">📊</div>
+        <p><strong>Click to upload</strong> or drag and drop</p>
+        <p>CSV files only</p>
+      </div>
+      <div id="csv-preview" style="display:none"></div>
+      <div id="csv-actions" style="display:none;gap:10px;margin-top:16px;">
+        <button class="btn btn-primary" onclick="runImport('csv')" style="flex:1">Import Items</button>
+        <button class="btn btn-outline" onclick="resetCSV()">Clear</button>
+      </div>
+    </div>
+
+    <!-- AI -->
+    <div id="import-tab-ai" style="display:none">
+      <p style="font-size:14px;color:var(--gray);margin-bottom:12px">Upload a PDF, Word, or text file — Claude AI will automatically extract your data.</p>
+      <div class="import-zone" id="ai-drop-zone"
+        onclick="document.getElementById('ai-file-input').click()"
+        ondragover="handleDragOver(event,'ai-drop-zone')"
+        ondragleave="handleDragLeave(event,'ai-drop-zone')"
+        ondrop="handleDrop(event,'ai')">
+        <input type="file" id="ai-file-input" accept=".pdf,.doc,.docx,.txt" onchange="handleAIFile(this.files[0])">
+        <div class="import-icon">🤖</div>
+        <p><strong>Click to upload</strong> or drag and drop</p>
+        <p>PDF, Word (.docx), or Text files</p>
+      </div>
+      <div id="ai-processing" class="ai-processing" style="display:none">
+        <div class="spinner"></div>
+        <span id="ai-status-text">Claude is reading your document...</span>
+      </div>
+      <div id="ai-preview" style="display:none"></div>
+      <div id="ai-actions" style="display:none;gap:10px;margin-top:16px;">
+        <button class="btn btn-primary" onclick="runImport('ai')" style="flex:1">Import Extracted Items</button>
+        <button class="btn btn-outline" onclick="resetAI()">Clear</button>
+      </div>
+    </div>
+
+    <div id="import-summary" style="display:none"></div>
+  </div>
+</div>
+
+<!-- DUPLICATE MODAL -->
+<div class="modal-overlay" id="duplicate-modal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header"><h3 class="modal-title">Duplicate Found</h3></div>
+    <div class="duplicate-item">
+      <strong id="dup-name"></strong>
+      <span id="dup-detail" style="color:var(--gray);font-size:13px"></span>
+    </div>
+    <p style="font-size:14px;color:var(--gray);margin-bottom:20px">This item already exists. What would you like to do?</p>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button class="btn btn-primary" onclick="resolveDup('overwrite')">Overwrite existing</button>
+      <button class="btn btn-outline" onclick="resolveDup('skip')">Skip this item</button>
+      <button class="btn btn-outline" onclick="resolveDup('skipall')">Skip all duplicates</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'http://127.0.0.1:5000/api';
+const CLAUDE_API = 'http://127.0.0.1:5000/api/ai';
+let token = localStorage.getItem('travel_token');
+let userEmail = localStorage.getItem('travel_email');
+let allTrips = [], allDocs = [], allLoyalty = [];
+let importType = 'loyalty';
+let csvData = [], aiData = [];
+let dupResolve = null, skipAll = false;
+
+if (token) showApp();
+
+// AUTH
+function switchTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('login-form').style.display = tab === 'login' ? 'block' : 'none';
+  document.getElementById('signup-form').style.display = tab === 'signup' ? 'block' : 'none';
+  document.getElementById('auth-error').style.display = 'none';
+  document.getElementById('auth-success').style.display = 'none';
+}
+
+async function login() {
+  document.getElementById('auth-error').style.display = 'none';
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  if (!email || !password) { showAuthMsg('error', 'Please fill in all fields.'); return; }
+  try {
+    const res = await fetch(`${API}/auth/login`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password}) });
+    const data = await res.json();
+    if (!res.ok) { showAuthMsg('error', data.error || 'Login failed.'); return; }
+    token = data.access_token; userEmail = data.user;
+    localStorage.setItem('travel_token', token);
+    localStorage.setItem('travel_email', userEmail);
+    showApp();
+  } catch { showAuthMsg('error', 'Could not connect to server. Is Flask running?'); }
+}
+
+async function signup() {
+  const email = document.getElementById('signup-email').value;
+  const password = document.getElementById('signup-password').value;
+  if (!email || !password) { showAuthMsg('error', 'Please fill in all fields.'); return; }
+  try {
+    const res = await fetch(`${API}/auth/signup`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password}) });
+    const data = await res.json();
+    showAuthMsg('success', data.message || 'Account created!');
+  } catch { showAuthMsg('error', 'Could not connect to server. Is Flask running?'); }
+}
+
+function showAuthMsg(type, msg) {
+  const el = document.getElementById(type === 'error' ? 'auth-error' : 'auth-success');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+function logout() {
+  localStorage.clear(); token = null; userEmail = null;
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('app-screen').style.display = 'none';
+}
+
+function showApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  if (userEmail) {
+    document.getElementById('user-email-display').textContent = userEmail;
+    document.getElementById('user-avatar').textContent = userEmail[0].toUpperCase();
+    document.getElementById('welcome-name').textContent = userEmail.split('@')[0];
+  }
+  loadAll();
+}
+
+function showPage(page, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`page-${page}`).classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+async function apiFetch(path, method='GET', body=null) {
+  const opts = { method, headers: { 'Content-Type':'application/json', 'Authorization': token } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(`${API}${path}`, opts);
+  return res.json();
+}
+
+async function loadAll() {
+  await Promise.all([loadTrips(), loadDocuments(), loadLoyalty()]);
+  updateDashboard();
+}
+
+// TRIPS
+async function loadTrips() {
+  try { allTrips = await apiFetch('/trips'); renderTrips(); } catch { showToast('Failed to load trips','error'); }
+}
+function renderTrips() {
+  const el = document.getElementById('trips-list');
+  if (!allTrips.length) { el.innerHTML=`<div class="empty-state"><div class="empty-icon">✈️</div><p>No trips yet.</p><button class="btn btn-gold" onclick="openTripModal()">+ Add Trip</button></div>`; return; }
+  el.innerHTML=`<div class="card-grid">${allTrips.map(t=>`<div class="trip-card"><h3>${t.destination}</h3><div class="country">${t.country||''}</div><div class="trip-meta"><span class="badge badge-${t.status}">${t.status}</span>${t.start_date?`<span class="badge badge-gold">📅 ${formatDate(t.start_date)}</span>`:''}</div>${t.hotel?`<div style="font-size:13px;color:var(--gray);margin-bottom:8px">🏨 ${t.hotel}</div>`:''}<div class="trip-actions"><button class="btn btn-outline btn-sm" onclick="editTrip('${t.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteTrip('${t.id}')">Delete</button></div></div>`).join('')}</div>`;
+}
+function openTripModal(t=null) {
+  document.getElementById('trip-modal-title').textContent = t?'Edit Trip':'Add Trip';
+  ['trip-id','trip-destination','trip-country','trip-start','trip-end','trip-hotel','trip-ref','trip-points-program','trip-points','trip-notes'].forEach(id=>{
+    document.getElementById(id).value = t ? (t[id.replace('trip-','').replace(/-/g,'_')]||'') : '';
+  });
+  document.getElementById('trip-id').value = t?t.id:'';
+  document.getElementById('trip-destination').value = t?t.destination:'';
+  document.getElementById('trip-country').value = t?t.country||'':'';
+  document.getElementById('trip-start').value = t?t.start_date||'':'';
+  document.getElementById('trip-end').value = t?t.end_date||'':'';
+  document.getElementById('trip-status').value = t?t.status:'planning';
+  document.getElementById('trip-hotel').value = t?t.hotel||'':'';
+  document.getElementById('trip-ref').value = t?t.booking_ref||'':'';
+  document.getElementById('trip-points-program').value = t?t.points_program||'':'';
+  document.getElementById('trip-points').value = t?t.points_used||'':'';
+  document.getElementById('trip-notes').value = t?t.notes||'':'';
+  document.getElementById('trip-modal').classList.add('active');
+}
+function editTrip(id) { const t=allTrips.find(t=>t.id===id); if(t) openTripModal(t); }
+async function saveTrip() {
+  const id=document.getElementById('trip-id').value;
+  const destination=document.getElementById('trip-destination').value;
+  if (!destination) { showToast('Destination is required','error'); return; }
+  const data={destination, country:document.getElementById('trip-country').value||null, start_date:document.getElementById('trip-start').value||null, end_date:document.getElementById('trip-end').value||null, status:document.getElementById('trip-status').value, hotel:document.getElementById('trip-hotel').value||null, booking_ref:document.getElementById('trip-ref').value||null, points_program:document.getElementById('trip-points-program').value||null, points_used:parseInt(document.getElementById('trip-points').value)||0, notes:document.getElementById('trip-notes').value||null};
+  try { if(id){await apiFetch(`/trips/${id}`,'PUT',data);showToast('Trip updated!','success');}else{await apiFetch('/trips','POST',data);showToast('Trip added!','success');} closeModal('trip-modal'); await loadTrips(); updateDashboard(); } catch { showToast('Failed to save','error'); }
+}
+async function deleteTrip(id) { if(!confirm('Delete this trip?'))return; await apiFetch(`/trips/${id}`,'DELETE'); showToast('Trip deleted','success'); await loadTrips(); updateDashboard(); }
+
+// DOCUMENTS
+async function loadDocuments() {
+  try { allDocs = await apiFetch('/documents'); renderDocuments(); } catch { showToast('Failed to load documents','error'); }
+}
+const docIcons={passport:'🛂',visa:'📋',insurance:'🛡️',membership:'🎫',license:'🪪',other:'📄'};
+function renderDocuments() {
+  const el=document.getElementById('docs-list');
+  if (!allDocs.length) { el.innerHTML=`<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">📄</div><p>No documents yet.</p><button class="btn btn-gold" onclick="openDocModal()">+ Add Document</button></div>`; return; }
+  el.innerHTML=allDocs.map(d=>{const exp=d.expiry_date?getExpiry(d.expiry_date):null;return`<div class="doc-card"><div class="doc-type-icon">${docIcons[d.type]||'📄'}</div><h3>${d.name}</h3><div style="font-size:13px;color:var(--gray)">${d.type}</div>${d.doc_number?`<div style="font-size:12px;color:var(--gray);margin-top:4px"># ${d.doc_number}</div>`:''} ${d.issuing_country?`<div style="font-size:12px;color:var(--gray)">🌏 ${d.issuing_country}</div>`:''} ${exp?`<div class="doc-expiry ${exp.cls}">Expires ${formatDate(d.expiry_date)} ${exp.lbl}</div>`:''}<div style="margin-top:12px;display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="editDoc('${d.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteDoc('${d.id}')">Delete</button></div></div>`;}).join('');
+}
+function getExpiry(ds){const days=Math.ceil((new Date(ds)-new Date())/86400000);if(days<0)return{cls:'expiry-expired',lbl:'⚠️ Expired'};if(days<90)return{cls:'expiry-soon',lbl:`⚠️ ${days}d left`};return{cls:'expiry-ok',lbl:'✓ Valid'};}
+function openDocModal(d=null){document.getElementById('doc-modal-title').textContent=d?'Edit Document':'Add Document';document.getElementById('doc-id').value=d?d.id:'';document.getElementById('doc-name').value=d?d.name:'';document.getElementById('doc-type').value=d?d.type:'passport';document.getElementById('doc-number').value=d?d.doc_number||'':'';document.getElementById('doc-country').value=d?d.issuing_country||'':'';document.getElementById('doc-issued').value=d?d.issued_date||'':'';document.getElementById('doc-expiry').value=d?d.expiry_date||'':'';document.getElementById('doc-notes').value=d?d.notes||'':'';document.getElementById('doc-modal').classList.add('active');}
+function editDoc(id){const d=allDocs.find(d=>d.id===id);if(d)openDocModal(d);}
+async function saveDocument(){const id=document.getElementById('doc-id').value;const name=document.getElementById('doc-name').value;if(!name){showToast('Name required','error');return;}const data={name,type:document.getElementById('doc-type').value,doc_number:document.getElementById('doc-number').value||null,issuing_country:document.getElementById('doc-country').value||null,issued_date:document.getElementById('doc-issued').value||null,expiry_date:document.getElementById('doc-expiry').value||null,notes:document.getElementById('doc-notes').value||null};try{if(id){await apiFetch(`/documents/${id}`,'PUT',data);showToast('Document updated!','success');}else{await apiFetch('/documents','POST',data);showToast('Document added!','success');}closeModal('doc-modal');await loadDocuments();updateDashboard();}catch{showToast('Failed to save','error');}}
+async function deleteDoc(id){if(!confirm('Delete this document?'))return;await apiFetch(`/documents/${id}`,'DELETE');showToast('Document deleted','success');await loadDocuments();updateDashboard();}
+
+// LOYALTY
+async function loadLoyalty(){try{allLoyalty=await apiFetch('/loyalty');renderLoyalty();}catch{showToast('Failed to load loyalty','error');}}
+function renderLoyalty(){const el=document.getElementById('loyalty-list');if(!allLoyalty.length){el.innerHTML=`<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">⭐</div><p>No loyalty programs yet.</p><button class="btn btn-gold" onclick="openLoyaltyModal()">+ Add Program</button></div>`;return;}el.innerHTML=allLoyalty.map(l=>`<div class="loyalty-card"><div class="loyalty-program">${l.program}</div><div class="loyalty-id">${l.member_id||'No member ID'}</div><div class="loyalty-points">${(l.points_balance||0).toLocaleString()} <span>points</span></div>${l.tier?`<div class="loyalty-tier">⭐ ${l.tier}</div>`:''} ${l.expiry_date?`<div style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:8px">Expires ${formatDate(l.expiry_date)}</div>`:''}<div class="loyalty-actions"><button class="btn btn-light btn-sm" onclick="editLoyalty('${l.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteLoyalty('${l.id}')">Delete</button></div></div>`).join('');}
+function openLoyaltyModal(l=null){document.getElementById('loyalty-modal-title').textContent=l?'Edit Program':'Add Loyalty Program';document.getElementById('loyalty-id').value=l?l.id:'';document.getElementById('loyalty-program').value=l?l.program:'';document.getElementById('loyalty-member-id').value=l?l.member_id||'':'';document.getElementById('loyalty-points').value=l?l.points_balance||'':'';document.getElementById('loyalty-tier').value=l?l.tier||'':'';document.getElementById('loyalty-expiry').value=l?l.expiry_date||'':'';document.getElementById('loyalty-notes').value=l?l.notes||'':'';document.getElementById('loyalty-modal').classList.add('active');}
+function editLoyalty(id){const l=allLoyalty.find(x=>x.id===id);if(l)openLoyaltyModal(l);}
+async function saveLoyalty(){const id=document.getElementById('loyalty-id').value;const program=document.getElementById('loyalty-program').value;if(!program){showToast('Program name required','error');return;}const data={program,member_id:document.getElementById('loyalty-member-id').value||null,points_balance:parseInt(document.getElementById('loyalty-points').value)||0,tier:document.getElementById('loyalty-tier').value||null,expiry_date:document.getElementById('loyalty-expiry').value||null,notes:document.getElementById('loyalty-notes').value||null};try{if(id){await apiFetch(`/loyalty/${id}`,'PUT',data);showToast('Program updated!','success');}else{await apiFetch('/loyalty','POST',data);showToast('Program added!','success');}closeModal('loyalty-modal');await loadLoyalty();updateDashboard();}catch{showToast('Failed to save','error');}}
+async function deleteLoyalty(id){if(!confirm('Delete this program?'))return;await apiFetch(`/loyalty/${id}`,'DELETE');showToast('Program deleted','success');await loadLoyalty();updateDashboard();}
+
+// ── IMPORT ──
+function openImportModal(type) {
+  importType = type;
+  document.getElementById('import-modal-title').textContent = `Import ${type==='loyalty'?'Loyalty Programs':'Documents'}`;
+  document.getElementById('import-summary').style.display = 'none';
+  resetCSV(); resetAI();
+  switchImportTab('csv');
+  document.getElementById('import-modal').classList.add('active');
+}
+
+function switchImportTab(tab) {
+  document.getElementById('tab-csv').classList.toggle('active', tab==='csv');
+  document.getElementById('tab-ai').classList.toggle('active', tab==='ai');
+  document.getElementById('import-tab-csv').style.display = tab==='csv'?'block':'none';
+  document.getElementById('import-tab-ai').style.display = tab==='ai'?'block':'none';
+}
+
+function handleDragOver(e, zoneId) { e.preventDefault(); document.getElementById(zoneId).classList.add('dragover'); }
+function handleDragLeave(e, zoneId) { document.getElementById(zoneId).classList.remove('dragover'); }
+function handleDrop(e, type) {
+  e.preventDefault();
+  document.getElementById(type==='csv'?'csv-drop-zone':'ai-drop-zone').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  if (type==='csv') handleCSVFile(file); else handleAIFile(file);
+}
+
+// CSV
+function handleCSVFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => { csvData = parseCSV(e.target.result); renderPreview('csv', csvData); };
+  reader.readAsText(file);
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.trim().replace(/"/g,'').toLowerCase());
+  return lines.slice(1).map(line => {
+    const vals = line.split(',').map(v => v.trim().replace(/"/g,''));
+    const obj = {}; headers.forEach((h,i) => obj[h] = vals[i]||'');
+    return obj;
+  }).filter(r => Object.values(r).some(v=>v));
+}
+
+// AI
+async function handleAIFile(file) {
+  if (!file) return;
+  document.getElementById('ai-processing').style.display = 'flex';
+  document.getElementById('ai-preview').style.display = 'none';
+  document.getElementById('ai-actions').style.display = 'none';
+  document.getElementById('ai-status-text').textContent = 'Claude is reading your document...';
+  try {
+    const ext = file.name.split('.').pop().toLowerCase();
+    let extracted;
+    if (ext === 'pdf') {
+      const b64 = await toBase64(file);
+      extracted = await callClaudeWithDoc(b64, 'application/pdf');
+    } else {
+      const text = await file.text();
+      extracted = await callClaudeWithText(text);
+    }
+    aiData = extracted;
+    renderPreview('ai', aiData);
+  } catch(e) {
+    showToast('Failed to process file: ' + e.message, 'error');
+  } finally {
+    document.getElementById('ai-processing').style.display = 'none';
+  }
+}
+
+function toBase64(file) {
+  return new Promise((res,rej) => { const r=new FileReader(); r.onload=e=>res(e.target.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(file); });
+}
+
+function buildPrompt() {
+  if (importType === 'loyalty') return `Extract ALL loyalty program records from this document. Return ONLY a JSON array. Each object must have: program (string), member_id (string or null), points_balance (number), tier (string or null), expiry_date (YYYY-MM-DD or null), notes (string or null). No explanation, just the JSON array.`;
+  return `Extract ALL travel document records from this document. Return ONLY a JSON array. Each object must have: name (string), type (one of: passport/visa/insurance/membership/license/other), doc_number (string or null), issuing_country (string or null), issued_date (YYYY-MM-DD or null), expiry_date (YYYY-MM-DD or null), notes (string or null). No explanation, just the JSON array.`;
+}
+
+async function callClaudeWithDoc(b64, mediaType) {
+  const res = await fetch(CLAUDE_API, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ messages:[{role:'user',content:[{type:'document',source:{type:'base64',media_type:mediaType,data:b64}},{type:'text',text:buildPrompt()}]}] }) });
+  const data = await res.json();
+  return parseJSON(data.content);
+}
+
+async function callClaudeWithText(text) {
+  const res = await fetch(CLAUDE_API, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ system: buildPrompt(), messages:[{role:'user',content:`Document text:\n${text}`}] }) });
+  const data = await res.json();
+  return parseJSON(data.content);
+}
+function parseJSON(text) { try { return JSON.parse(text.replace(/```json|```/g,'').trim()); } catch { return []; } }
+
+// Render preview table
+function renderPreview(source, data) {
+  const nameKey = importType==='loyalty'?'program':'name';
+  const existing = importType==='loyalty'?allLoyalty:allDocs;
+  const rows = data.map(r => ({ ...r, _dup: existing.some(e=>(e[nameKey]||'').toLowerCase()===(r[nameKey]||'').toLowerCase()) }));
+  if (source==='csv') csvData = rows; else aiData = rows;
+
+  const newN = rows.filter(r=>!r._dup).length;
+  const dupN = rows.filter(r=>r._dup).length;
+  const previewId = source==='csv'?'csv-preview':'ai-preview';
+  const actionsId = source==='csv'?'csv-actions':'ai-actions';
+
+  if (!rows.length) { showToast('No data found in file','error'); return; }
+
+  document.getElementById(previewId).style.display = 'block';
+  document.getElementById(previewId).innerHTML = `
+    <p style="font-size:13px;color:var(--gray);margin-bottom:10px">Found <strong>${rows.length}</strong> items — <strong style="color:var(--green)">${newN} new</strong>, <strong style="color:#d97706">${dupN} duplicate${dupN!==1?'s':''}</strong></p>
+    <div class="scroll-wrap"><table>
+      <thead><tr><th>Name</th><th>Status</th>${importType==='loyalty'?'<th>Points</th><th>Tier</th>':'<th>Type</th><th>Expiry</th>'}</tr></thead>
+      <tbody>${rows.map(r=>`<tr><td>${importType==='loyalty'?r.program||'':r.name||''}</td><td><span class="import-status ${r._dup?'duplicate':'new'}">${r._dup?'⚠ Duplicate':'✓ New'}</span></td>${importType==='loyalty'?`<td>${(parseInt(r.points_balance)||0).toLocaleString()}</td><td>${r.tier||'—'}</td>`:`<td>${r.type||'other'}</td><td>${r.expiry_date||'—'}</td>`}</tr>`).join('')}
+      </tbody>
+    </table></div>`;
+
+  document.getElementById(actionsId).style.display = 'flex';
+}
+
+// Run import
+async function runImport(source) {
+  const rows = source==='csv'?csvData:aiData;
+  skipAll = false;
+  let imported=0, skipped=0, overwritten=0;
+
+  for (const row of rows) {
+    if (row._dup) {
+      if (skipAll) { skipped++; continue; }
+      const nameKey = importType==='loyalty'?'program':'name';
+      const action = await promptDuplicate(row[nameKey]||'', importType==='loyalty'?`Points: ${row.points_balance||0}`:`Type: ${row.type||'other'}`);
+      if (action==='skip') { skipped++; continue; }
+      if (action==='skipall') { skipAll=true; skipped++; continue; }
+      if (action==='overwrite') { await doOverwrite(row); overwritten++; continue; }
+    }
+    await doSave(row);
+    imported++;
+  }
+  await loadAll();
+  const el = document.getElementById('import-summary');
+  el.style.display = 'block';
+  el.innerHTML = `<div class="import-summary"><h4>✅ Import Complete</h4><p>${imported} imported${overwritten?`, ${overwritten} overwritten`:''}${skipped?`, ${skipped} skipped`:''}</p></div>`;
+}
+
+async function doSave(row) {
+  if (importType==='loyalty') {
+    await apiFetch('/loyalty','POST',{ program:row.program||'', member_id:row.member_id||null, points_balance:parseInt(row.points_balance)||0, tier:row.tier||null, expiry_date:normDate(row.expiry_date), notes:row.notes||null });
+  } else {
+    await apiFetch('/documents','POST',{ name:row.name||'', type:normType(row.type), doc_number:row.doc_number||null, issuing_country:row.issuing_country||row.country||null, issued_date:normDate(row.issued_date||row.issued), expiry_date:normDate(row.expiry_date||row.expiry), notes:row.notes||null });
+  }
+}
+
+async function doOverwrite(row) {
+  const nameKey = importType==='loyalty'?'program':'name';
+  const name = row[nameKey]||'';
+  const existing = importType==='loyalty'
+    ? allLoyalty.find(e=>e.program.toLowerCase()===name.toLowerCase())
+    : allDocs.find(e=>e.name.toLowerCase()===name.toLowerCase());
+  if (!existing) { await doSave(row); return; }
+  const ep = importType==='loyalty'?`/loyalty/${existing.id}`:`/documents/${existing.id}`;
+  if (importType==='loyalty') {
+    await apiFetch(ep,'PUT',{ program:row.program||'', member_id:row.member_id||null, points_balance:parseInt(row.points_balance)||0, tier:row.tier||null, expiry_date:normDate(row.expiry_date), notes:row.notes||null });
+  } else {
+    await apiFetch(ep,'PUT',{ name:row.name||'', type:normType(row.type), doc_number:row.doc_number||null, issuing_country:row.issuing_country||row.country||null, issued_date:normDate(row.issued_date||row.issued), expiry_date:normDate(row.expiry_date||row.expiry), notes:row.notes||null });
+  }
+}
+
+function promptDuplicate(name, detail) {
+  return new Promise(resolve => {
+    document.getElementById('dup-name').textContent = name;
+    document.getElementById('dup-detail').textContent = detail;
+    document.getElementById('duplicate-modal').classList.add('active');
+    dupResolve = resolve;
+  });
+}
+
+function resolveDup(action) {
+  document.getElementById('duplicate-modal').classList.remove('active');
+  if (dupResolve) { dupResolve(action); dupResolve=null; }
+}
+
+function resetCSV() { csvData=[]; document.getElementById('csv-preview').style.display='none'; document.getElementById('csv-actions').style.display='none'; document.getElementById('csv-file-input').value=''; }
+function resetAI() { aiData=[]; document.getElementById('ai-preview').style.display='none'; document.getElementById('ai-actions').style.display='none'; document.getElementById('ai-processing').style.display='none'; document.getElementById('ai-file-input').value=''; }
+
+function downloadTemplate() {
+  let csv;
+  if (importType==='loyalty') csv='program,member_id,points_balance,tier,expiry_date,notes\nQantas Frequent Flyer,QF123456,50000,Gold,2026-12-31,Main airline\nVirgin Velocity,VA789012,25000,Silver,,';
+  else csv='name,type,doc_number,issuing_country,issued_date,expiry_date,notes\nMy Passport,passport,P1234567,Australia,2020-01-01,2030-01-01,\nTravel Insurance,insurance,INS-001,Australia,2024-01-01,2025-01-01,Annual policy';
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=`${importType}-template.csv`; a.click();
+}
+
+// HELPERS
+function normType(t) { const v=['passport','visa','insurance','membership','license','other']; return v.includes((t||'').toLowerCase())?(t||'').toLowerCase():'other'; }
+function normDate(d) { if(!d)return null; if(/^\d{4}-\d{2}-\d{2}$/.test(d))return d; try{return new Date(d).toISOString().split('T')[0];}catch{return null;} }
+
+function updateDashboard() {
+  const up = allTrips.filter(t=>t.status==='planning'||t.status==='confirmed');
+  document.getElementById('stat-trips').textContent = allTrips.length;
+  document.getElementById('stat-upcoming').textContent = up.length;
+  document.getElementById('stat-docs').textContent = allDocs.length;
+  document.getElementById('stat-loyalty').textContent = allLoyalty.length;
+  const el=document.getElementById('dashboard-trips');
+  if (!up.length) { el.innerHTML=`<div style="color:var(--gray);font-size:14px;text-align:center;padding:20px">No upcoming trips.</div>`; return; }
+  el.innerHTML=up.slice(0,3).map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f3f4f6"><div><div style="font-weight:500">${t.destination}${t.country?', '+t.country:''}</div><div style="font-size:13px;color:var(--gray)">${t.start_date?formatDate(t.start_date):'No date set'}</div></div><span class="badge badge-${t.status}">${t.status}</span></div>`).join('');
+}
+
+function formatDate(d) { if(!d)return''; return new Date(d+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+function showToast(msg,type='success') { const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast ${type} show`; setTimeout(()=>t.className='toast',3000); }
+
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('active');}));
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('auth-screen').style.display!=='none')login();});
+</script>
+</body>
+</html>

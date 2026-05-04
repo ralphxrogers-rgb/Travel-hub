@@ -1,0 +1,7 @@
+node_modules/
+venv/
+.env
+.env.local
+.claude/
+build/
+python -m venv venv
